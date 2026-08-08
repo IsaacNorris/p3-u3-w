@@ -1,6 +1,6 @@
 #pragma once
 
-#include "HAL.h"
+#include "../HAL/HAL.h"
 
 class tButton {
    public:

@@ -1,12 +1,13 @@
 #pragma once
 
-#include "HAL.h"
+#include "../HAL/HAL.h"
 
 static constexpr bool LogInfo = true;
 static constexpr bool LogError = true;
 static constexpr bool LogWarning = true;
 static constexpr bool LogDebug = true;
-static constexpr bool LogCustom = false;
+static constexpr bool LogCustom = true;
+static constexpr bool LogRaw = true;
 
 class Log {
    public:
@@ -15,6 +16,7 @@ class Log {
     static void Warning(const char* message);
     static void Debug(const char* message);
     static void Custom(const char* level, const char* message);
+    static void Raw(const char* str);
 };
 
 inline void Log::Info(const char* message) {
@@ -63,5 +65,10 @@ inline void Log::Custom(const char* level, const char* message) {
         HAL::Print(": ");
         HAL::Print(message);
         HAL::Print("\n");
+    }
+}
+inline void Log::Raw(const char* str) {
+    if constexpr (LogRaw) {
+        HAL::Print(str);
     }
 }

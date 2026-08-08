@@ -16,16 +16,11 @@ class HAL {
         ButtonVolumeDown,
     };
 
-    enum class eDigitalOutput {
-        Heartbeat,
-    };
-
     enum class eAnalogInput {
         BatteryPercentage,
     };
 
     static tDigitalValue ReadDigitalInput(eDigitalInput pin);
-    static void WriteDigitalOutput(eDigitalOutput pin, tDigitalValue value);
     static tVoltage ReadAnalogInput(eAnalogInput pin);
     static tTimeMs GetCurrentTimeMs();
     static void Print(const char* str);

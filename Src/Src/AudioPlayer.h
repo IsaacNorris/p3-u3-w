@@ -1,7 +1,7 @@
 #pragma once
 
-#include "AudioDriver.h"
-#include "HAL.h"
+#include "../Drivers/AudioDriver.h"
+#include "../HAL/HAL.h"
 #include "Log.h"
 
 class tAudioPlayer {
