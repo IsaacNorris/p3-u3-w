@@ -24,7 +24,7 @@ inline const char* tSong::SongName() { return file_->GetFileName(); }
 
 class tPlaylist {
    public:
-    tPlaylist();
+    tPlaylist(tFolder* folder);
 
     const char* PlaylistName();
 
@@ -38,7 +38,7 @@ class tPlaylist {
     bool playlistLoaded_{false};
 };
 
-inline tPlaylist::tPlaylist() {}
+inline tPlaylist::tPlaylist(tFolder* folder) : folder_(folder) {}
 inline const char* tPlaylist::PlaylistName() {
     return folder_->GetFolderName();
 }
@@ -46,9 +46,9 @@ inline const char* tPlaylist::PlaylistName() {
 inline void tPlaylist::LoadPlaylist() {
     bool success = false;
     // based on all the mp3 files under the folder_.FullPath
-    // build up a vecotr of songs.
+    // build up a vector of songs.
     songs_.clear();
-    std::vector<tFile*> files = tFileManager::GetFiles(folder_->GetFullPath());
+    std::vector<tFile*> files = fileManager.GetFiles(folder_->GetFullPath());
     for (tFile* file : files) {
         songs_.push_back(new tSong(file));
     }

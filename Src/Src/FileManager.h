@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <vector>
 
 #include "../Drivers/SDCardDriver.h"
 #include "../HAL/HAL.h"
@@ -36,22 +37,34 @@ class tFolder {
 tFolder::tFolder(std::array<char, MaxFilePathLength> folderPath)
     : folderPath_(folderPath) {}
 
-class tFileManager {
+class FileManager {
    public:
-    tFileManager();
+    FileManager();
 
     std::vector<tFile*> GetFiles(const char* folderPath);
+    std::vector<tFolder*> GetFolders();
 
    private:
     tSDCardDriver sdCardDriver_;
 };
 
-inline tFileManager::tFileManager() {}
+//global
+inline FileManager fileManager;
 
-inline std::vector<tFile*> tFileManager::GetFiles(const char* folderPath) {
+inline FileManager::FileManager() {}
+
+inline std::vector<tFile*> FileManager::GetFiles(const char* folderPath) {
     std::vector<tFile*> files;
 
     // use the sdCardDriver_ to list the files in the folderPath
 
     return files;
+}
+
+inline std::vector<tFolder*> FileManager::GetFolders() {
+    std::vector<tFolder*> folders;
+
+    // use the sdCardDriver_ to list the files in the folderPath
+
+    return folders;
 }

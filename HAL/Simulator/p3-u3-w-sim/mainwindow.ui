@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>367</width>
+    <width>465</width>
     <height>187</height>
    </rect>
   </property>
@@ -105,13 +105,26 @@
      <enum>Qt::Orientation::Vertical</enum>
     </property>
    </widget>
+   <widget class="QPushButton" name="pb_step">
+    <property name="geometry">
+     <rect>
+      <x>360</x>
+      <y>60</y>
+      <width>80</width>
+      <height>24</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Step+</string>
+    </property>
+   </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>367</width>
+     <width>465</width>
      <height>21</height>
     </rect>
    </property>
