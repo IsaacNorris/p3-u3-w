@@ -24,6 +24,7 @@ HEADERS += \
     ../../../Src/Src/Elapsed.h \
     ../../../Src/Src/FileManager.h \
     ../../../Src/Src/Log.h \
+    ../../../Src/Src/MusicManager.h \
     ../../../Src/Src/Song.h \
     ../../../Src/Src/System.h \
     mainwindow.h

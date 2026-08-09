@@ -6,6 +6,7 @@ using tTimeMs = uint32_t;
 using tVoltage = float;
 using tDigitalValue = bool;
 using tBatteryPercentage = uint8_t;
+using tVolumeValue = uint8_t;
 
 class HAL {
    public:
