@@ -1,9 +1,9 @@
 #include "mainwindow.h"
 
+#include "../../../Src/Hal/HAL.h"
+#include "../../../Src/Src/System.h"
 #include "ui_mainwindow.h"
 
-#include "../../../Src/Src/System.h"
-#include "../../../Src/Hal/HAL.h"
 
 MainWindow* mainWindow;
 
@@ -17,19 +17,18 @@ MainWindow::MainWindow(QWidget* parent)
 
     loopTimer.setTimerType(Qt::PreciseTimer);
     loopTimer.setInterval(1);
-    QObject::connect(&loopTimer, &QTimer::timeout, this, [=]() {
-        system->Update();
-    });
+    QObject::connect(&loopTimer, &QTimer::timeout, this,
+                     [=]() { system->Update(); });
 
     loopTimer.start();
 }
 
 MainWindow::~MainWindow() { delete ui; }
 
-tDigitalValue HAL::ReadDigitalInput(HAL::eDigitalInput pin){
-    tDigitalValue value {};
+tDigitalValue HAL::ReadDigitalInput(HAL::eDigitalInput pin) {
+    tDigitalValue value{};
 
-    switch(pin){
+    switch (pin) {
         case HAL::eDigitalInput::ButtonPlay:
             value = mainWindow->ui->pb_pausePlay->isDown();
             break;
@@ -53,8 +52,8 @@ tDigitalValue HAL::ReadDigitalInput(HAL::eDigitalInput pin){
     return value;
 }
 
-tVoltage HAL::ReadAnalogInput(HAL::eAnalogInput pin){
-    tVoltage voltage {};
+tVoltage HAL::ReadAnalogInput(HAL::eAnalogInput pin) {
+    tVoltage voltage{};
 
     switch (pin) {
         case HAL::eAnalogInput::BatteryPercentage:
@@ -67,10 +66,8 @@ tVoltage HAL::ReadAnalogInput(HAL::eAnalogInput pin){
     return voltage;
 }
 
-tTimeMs HAL::GetCurrentTimeMs(){
+tTimeMs HAL::GetCurrentTimeMs() {
     return mainWindow->systemTimerElapsed.elapsed();
 }
 
-void HAL::Print(const char* str){
-    qDebug() << str;
-}
+void HAL::Print(const char* str) { qDebug() << str; }

@@ -22,5 +22,4 @@ inline void tSDCardDriver::Close() {}
 inline void tSDCardDriver::Read() {}
 
 inline void tSDCardDriver::Write() {}
-
 inline void tSDCardDriver::IOCTL() {}

@@ -23,7 +23,7 @@ tFile::tFile(std::array<char, MaxFilePathLength> filePath)
     : filePath_(filePath) {}
 
 class tFolder {
-public:
+   public:
     tFolder(std::array<char, MaxFilePathLength> folderPath);
 
     const char* GetFolderName() const;
@@ -40,8 +40,18 @@ class tFileManager {
    public:
     tFileManager();
 
+    std::vector<tFile*> GetFiles(const char* folderPath);
+
    private:
+    tSDCardDriver sdCardDriver_;
 };
 
-
 inline tFileManager::tFileManager() {}
+
+inline std::vector<tFile*> tFileManager::GetFiles(const char* folderPath) {
+    std::vector<tFile*> files;
+
+    // use the sdCardDriver_ to list the files in the folderPath
+
+    return files;
+}
