@@ -78,6 +78,14 @@ inline void tSystem::UpdateBattery() {
 
 inline void tSystem::SetState(eSystemState state) { systemState_ = state; }
 
+//menu button is back button
+//playbutton is select button
+//Next Previous are selection(next and previous)
+//volume buttons should be always volume control.
+
+//Battery, Volume should always be on display.
+//maybe time <- if its accurate.
+
 inline void tSystem::UpdateSystem() {
     switch (systemState_) {
         case eSystemState::Initialization:
@@ -124,16 +132,11 @@ inline void tSystem::SystemStateMainPage() {
 inline void tSystem::SystemStatePlayingMusic() {
     Log::Custom("SystemState", "PlayingMusic");
 
-    if (buttonMenu_.IsPressed()) {
-        if (buttonPlay_.IsClicked()) {
-            SetState(eSystemState::MainPage);
-        }
-    }
     if (buttonMenu_.IsReleased()) {
         SetState(eSystemState::PlayListSelection);
     }
     if (buttonPlay_.IsReleased()) {
-        // audioPlayer_.PlayPause();
+        musicManager_.PausePlaySong();
     }
     if (buttonVolumeUp_.IsReleased()) {
         musicManager_.DecrementVolume();
@@ -142,50 +145,40 @@ inline void tSystem::SystemStatePlayingMusic() {
         musicManager_.IncrementVolume();
     }
     if (buttonNext_.IsReleased()) {
-        // audioPlayer_.Next();
+        musicManager_.NextSong();
     }
     if (buttonPrevious_.IsReleased()) {
-        // audioPlayer_.Previous();
+        musicManager_.PreviousSong();
     }
 }
 
 inline void tSystem::SystemStatePlayListSelection() {
     Log::Custom("SystemState", "PlaylistSelection");
 
-    if (buttonMenu_.IsPressed()) {
-        if (buttonPlay_.IsClicked()) {
-            SetState(eSystemState::MainPage);
-        }
-    }
     if (buttonMenu_.IsReleased()) {
-        SetState(eSystemState::PlayingMusic);
+        SetState(eSystemState::MainPage);
     }
     if (buttonPlay_.IsReleased()) {
-        // audioPlayer_.PlayPause();
+        SetState(eSystemState::PlayingMusic);
     }
     if (buttonVolumeUp_.IsReleased()) {
-        // audioPlayer_.DecrementVolume();
+        musicManager_.DecrementVolume();
     }
     if (buttonVolumeDown_.IsReleased()) {
-        // audioPlayer_.IncrementVolume();
+        musicManager_.IncrementVolume();
     }
     if (buttonNext_.IsReleased()) {
-        // audioPlayer_.Next();
+        musicManager_.NextPlaylist();
     }
     if (buttonPrevious_.IsReleased()) {
-        // audioPlayer_.Previous();
-    }
-
-    // Dummy code:
-    if (buttonMenu_.HeldForMs() >= 1500) {
-        SetState(eSystemState::Settings);
+        musicManager_.PreviousPlaylist();
     }
 }
 
 inline void tSystem::SystemStateSettings() {
     Log::Custom("SystemState", "Setting");
 
-    if (buttonMenu_.IsClicked()) {
+    if (buttonMenu_.IsReleased()) {
         SetState(eSystemState::MainPage);
     }
 }

@@ -40,7 +40,7 @@ class tPlaylist {
     std::vector<tSong*> songs_;
     std::vector<tSong*>::iterator currentSongItr_ {songs_.end()};
 
-    tFolder* folder_;
+    tFolder* folder_ {};
 
     bool playlistLoaded_{false};
 };

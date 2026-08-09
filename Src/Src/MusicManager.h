@@ -20,8 +20,8 @@ class tMusicManager {
     void NextSong();
     void PreviousSong();
     void PausePlaySong();
-
     void NextPlaylist();
+    void PreviousPlaylist();
 
     void SetVolumeStep(tVolumeValue step);
 
@@ -80,10 +80,31 @@ inline void tMusicManager::NextPlaylist(){
     }
 
     ++currentPlaylistItr_;
+
     if(currentPlaylistItr_ == playlists_.end()){
         currentPlaylistItr_ = playlists_.begin();
     }
 
+    //If this operation takes too much time, we can make it happen after playlist is selected
+    //and we are moving to the playing music menu.
+    tPlaylist* playlist = *currentPlaylistItr_;
+    playlist->LoadPlaylist();
+}
+
+inline void tMusicManager::PreviousPlaylist(){
+    if(currentPlaylistItr_ == playlists_.end()){
+        Log::Error("Current Playlist Iterator invalid");
+        return;
+    }
+
+    if(currentPlaylistItr_ == playlists_.begin()){
+        currentPlaylistItr_ = playlists_.end();
+    }
+
+    --currentPlaylistItr_;
+
+    //If this operation takes too much time, we can make it happen after playlist is selected
+    //and we are moving to the playing music menu.
     tPlaylist* playlist = *currentPlaylistItr_;
     playlist->LoadPlaylist();
 }

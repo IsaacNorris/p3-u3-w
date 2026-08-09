@@ -23,6 +23,14 @@ class tFile {
 tFile::tFile(std::array<char, MaxFilePathLength> filePath)
     : filePath_(filePath) {}
 
+const char* tFile::GetFileName() const {
+    //TODO: add in parsing to get the name.
+    return filePath_.data();
+}
+const char* tFile::GetFullPath() const {
+    return filePath_.data();
+}
+
 class tFolder {
    public:
     tFolder(std::array<char, MaxFilePathLength> folderPath);
@@ -36,6 +44,14 @@ class tFolder {
 
 tFolder::tFolder(std::array<char, MaxFilePathLength> folderPath)
     : folderPath_(folderPath) {}
+
+const char* tFolder::GetFolderName() const {
+    //TODO: add in parsing to get the name.
+    return folderPath_.data();
+}
+const char* tFolder::GetFullPath() const {
+    return folderPath_.data();
+}
 
 class FileManager {
    public:
