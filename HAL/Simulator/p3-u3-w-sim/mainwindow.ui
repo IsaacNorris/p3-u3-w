@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>320</width>
+    <width>367</width>
     <height>187</height>
    </rect>
   </property>
@@ -17,8 +17,8 @@
    <widget class="QPushButton" name="pb_pausePlay">
     <property name="geometry">
      <rect>
-      <x>230</x>
-      <y>120</y>
+      <x>10</x>
+      <y>10</y>
       <width>80</width>
       <height>24</height>
      </rect>
@@ -30,7 +30,7 @@
    <widget class="QPushButton" name="pb_volP">
     <property name="geometry">
      <rect>
-      <x>120</x>
+      <x>140</x>
       <y>10</y>
       <width>80</width>
       <height>24</height>
@@ -53,23 +53,23 @@
      <string>Vol-</string>
     </property>
    </widget>
-   <widget class="QPushButton" name="pb_Skip">
+   <widget class="QPushButton" name="pb_next">
     <property name="geometry">
      <rect>
-      <x>10</x>
-      <y>10</y>
+      <x>140</x>
+      <y>120</y>
       <width>80</width>
       <height>24</height>
      </rect>
     </property>
     <property name="text">
-     <string>Skip</string>
+     <string>Next</string>
     </property>
    </widget>
    <widget class="QPushButton" name="pb_menu">
     <property name="geometry">
      <rect>
-      <x>120</x>
+      <x>10</x>
       <y>120</y>
       <width>80</width>
       <height>24</height>
@@ -79,13 +79,39 @@
      <string>Menu</string>
     </property>
    </widget>
+   <widget class="QPushButton" name="pb_previous">
+    <property name="geometry">
+     <rect>
+      <x>230</x>
+      <y>120</y>
+      <width>80</width>
+      <height>24</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Previous</string>
+    </property>
+   </widget>
+   <widget class="QSlider" name="s_battery">
+    <property name="geometry">
+     <rect>
+      <x>330</x>
+      <y>20</y>
+      <width>20</width>
+      <height>111</height>
+     </rect>
+    </property>
+    <property name="orientation">
+     <enum>Qt::Orientation::Vertical</enum>
+    </property>
+   </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>320</width>
+     <width>367</width>
      <height>21</height>
     </rect>
    </property>

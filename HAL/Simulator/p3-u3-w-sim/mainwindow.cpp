@@ -36,8 +36,11 @@ tDigitalValue HAL::ReadDigitalInput(HAL::eDigitalInput pin){
         case HAL::eDigitalInput::ButtonMenu:
             value = mainWindow->ui->pb_menu->isDown();
             break;
-        case HAL::eDigitalInput::ButtonSkip:
-            value = mainWindow->ui->pb_Skip->isDown();
+        case HAL::eDigitalInput::ButtonNext:
+            value = mainWindow->ui->pb_next->isDown();
+            break;
+        case HAL::eDigitalInput::ButtonPrevious:
+            value = mainWindow->ui->pb_previous->isDown();
             break;
         case HAL::eDigitalInput::ButtonVolumeUp:
             value = mainWindow->ui->pb_volP->isDown();
@@ -55,8 +58,9 @@ tVoltage HAL::ReadAnalogInput(HAL::eAnalogInput pin){
 
     switch (pin) {
         case HAL::eAnalogInput::BatteryPercentage:
-            // voltage = 0.0;
-            voltage = 3.3;
+            voltage = mainWindow->ui->s_battery->value() / 3;
+            voltage /= 10;
+            qDebug() << voltage;
             break;
     }
 

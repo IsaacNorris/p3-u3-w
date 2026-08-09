@@ -17,6 +17,7 @@ HEADERS += \
     ../../../Src/Drivers/BluetoothDriver.h \
     ../../../Src/Drivers/DisplayDriver.h \
     ../../../Src/Drivers/SDCardDriver.h \
+    ../../../Src/HAL/Conversion.h \
     ../../../Src/HAL/HAL.h \
     ../../../Src/Src/AudioPlayer.h \
     ../../../Src/Src/Button.h \

@@ -14,6 +14,8 @@ class tButton {
     bool IsReleased() const;
     bool IsClicked() const;
 
+    tTimeMs HeldForMs() const;
+
    private:
     bool currentState_{false};
     bool isClicked_{false};
@@ -21,6 +23,7 @@ class tButton {
     HAL::eDigitalInput button_;
     tTimeMs debounceTime_;
     tTimeMs lastPressedTime_;
+    tTimeMs pressedTimeStart_;
 };
 
 inline tButton::tButton(HAL::eDigitalInput button, tTimeMs debounceTime) {
@@ -43,8 +46,10 @@ inline void tButton::Update() {
 
             if (currentState_) {
                 isClicked_ = true;
+                pressedTimeStart_ = HAL::GetCurrentTimeMs();
             } else {
                 isReleased_ = true;
+                pressedTimeStart_ = 0;
             }
         }
     }
@@ -57,3 +62,11 @@ inline void tButton::SetButton(HAL::eDigitalInput button) { button_ = button; }
 inline bool tButton::IsClicked() const { return isClicked_; }
 
 inline bool tButton::IsReleased() const { return isReleased_; }
+
+inline tTimeMs tButton::HeldForMs() const {
+    if(IsPressed()){
+        return HAL::GetCurrentTimeMs() - pressedTimeStart_;
+    }else{
+        return 0;
+    }
+}
