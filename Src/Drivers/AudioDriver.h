@@ -13,26 +13,14 @@ private:
 
 };
 
-inline tAudioDriver::tAudioDriver() {
+inline tAudioDriver::tAudioDriver() {}
 
-}
+inline void tAudioDriver::Open() {}
 
-inline void tAudioDriver::Open(){
+inline void tAudioDriver::Close() {}
 
-}
+inline void tAudioDriver::Read() {}
 
-inline void tAudioDriver::Close(){
+inline void tAudioDriver::Write() {}
 
-}
-
-inline void tAudioDriver::Read(){
-
-}
-
-inline void tAudioDriver::Write(){
-
-}
-
-inline void tAudioDriver::IOCTL(){
-
-}
+inline void tAudioDriver::IOCTL() {}

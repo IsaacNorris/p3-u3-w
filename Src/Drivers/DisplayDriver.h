@@ -22,3 +22,5 @@ inline void tDisplayDriver::Close() {}
 inline void tDisplayDriver::Write() {}
 
 inline void tDisplayDriver::Read() {}
+
+inline void tDisplayDriver::IOCTL() {}

@@ -13,26 +13,14 @@ private:
 
 };
 
-inline tBluetoothDriver::tBluetoothDriver(){
+inline tBluetoothDriver::tBluetoothDriver() {}
 
-}
+inline void tBluetoothDriver::Open() {}
 
-inline void tBluetoothDriver::Open(){
+inline void tBluetoothDriver::Close() {}
 
-}
+inline void tBluetoothDriver::Read() {}
 
-inline void tBluetoothDriver::Close(){
+inline void tBluetoothDriver::Write() {}
 
-}
-
-inline void tBluetoothDriver::Read(){
-
-}
-
-inline void tBluetoothDriver::Write(){
-
-}
-
-inline void tBluetoothDriver::IOCTL(){
-
-}
+inline void tBluetoothDriver::IOCTL() {}
