@@ -52,9 +52,13 @@ struct tVolume {
 // never split across a refill and the card is still read in whole blocks.
 inline constexpr size_t AudioInputBufferBytes = 4096;
 
-// One card read per tick. A block at a time keeps any single tick short, which
-// matters because the display shares the superloop.
-inline constexpr size_t AudioReadChunkBytes = 1024;
+// One card read per tick, so this doubles as the ceiling on how fast a file can
+// be pulled in. Sized for the uncompressed case: WAV at 44.1 kHz stereo eats
+// 176 KB/s against MP3's 16 KB/s, so a 1 KB chunk would leave WAV with almost no
+// margin on a loop that ticks slower than a couple of milliseconds. Four blocks
+// is still a short enough read to not hold up the display, which shares the
+// superloop.
+inline constexpr size_t AudioReadChunkBytes = 2048;
 
 // How full the platform ring is made before playback is unpaused. Priming is
 // the difference between a song starting cleanly and starting with a stutter.

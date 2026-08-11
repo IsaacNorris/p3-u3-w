@@ -27,12 +27,12 @@ class FileManager {
     bool ForEachFolder(const char* folderPath, tFolderVisitor visitor,
                        void* context);
 
-    // Convenience wrappers over the walks above. These allocate one tFile or
-    // tFolder per entry and the caller owns them, so prefer ForEach* on any
-    // path that runs more than once.
-    std::vector<tFile*> GetFilesInFolder(const char* folderPath,
-                                         const char* extensionFilter = nullptr);
-    std::vector<tFolder*> GetFoldersInFolder(const char* folderPath);
+    // Convenience wrappers over the walks above. Entries come back by value, so
+    // there is nothing to free, but the vector itself still allocates. Prefer
+    // ForEach* on any path that runs more than once.
+    std::vector<tFile> GetFilesInFolder(const char* folderPath,
+                                        const char* extensionFilter = nullptr);
+    std::vector<tFolder> GetFoldersInFolder(const char* folderPath);
 
     bool Exists(const char* path);
     bool CreateDir(const char* folderPath);
@@ -150,15 +150,14 @@ inline bool FileManager::ForEachFolder(const char* folderPath,
     return listed;
 }
 
-inline std::vector<tFile*> FileManager::GetFilesInFolder(
+inline std::vector<tFile> FileManager::GetFilesInFolder(
     const char* folderPath, const char* extensionFilter) {
-    std::vector<tFile*> files;
+    std::vector<tFile> files;
 
     ForEachFile(
         folderPath,
         [](const tFile& file, void* context) {
-            static_cast<std::vector<tFile*>*>(context)->push_back(
-                new tFile(file));
+            static_cast<std::vector<tFile>*>(context)->push_back(file);
             return true;
         },
         &files, extensionFilter);
@@ -166,15 +165,14 @@ inline std::vector<tFile*> FileManager::GetFilesInFolder(
     return files;
 }
 
-inline std::vector<tFolder*> FileManager::GetFoldersInFolder(
+inline std::vector<tFolder> FileManager::GetFoldersInFolder(
     const char* folderPath) {
-    std::vector<tFolder*> folders;
+    std::vector<tFolder> folders;
 
     ForEachFolder(
         folderPath,
         [](const tFolder& folder, void* context) {
-            static_cast<std::vector<tFolder*>*>(context)->push_back(
-                new tFolder(folder));
+            static_cast<std::vector<tFolder>*>(context)->push_back(folder);
             return true;
         },
         &folders);

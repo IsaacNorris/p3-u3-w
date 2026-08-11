@@ -3,6 +3,7 @@
 #include "../HAL/HAL.h"
 #include "../HAL/Conversion.h"
 #include "Song.h"
+#include "Log.h"
 #include "../Drivers/DisplayDriver.h"
 
 class tDisplay{
@@ -28,11 +29,29 @@ inline tDisplay::tDisplay(){
 }
 
 //TODO: implement this.
-inline void tDisplay::DisplayMusicPlayingScreen(const char* songName, tBatteryPercentage batteryPercentage, tVolumeValue volume) {}
-inline void tDisplay::DisplayPlaylistScreen(const char* playlistName, tBatteryPercentage batteryPercentage, tVolumeValue volume) {}
+
+#warning qdebug enabled shouldn't be in hardware imple
+#include <QDebug>
+inline void tDisplay::DisplayMusicPlayingScreen(const char* songName, tBatteryPercentage batteryPercentage, tVolumeValue volume) {
+    qDebug() << "bat:" << batteryPercentage;
+    qDebug() << "vol:" << volume;
+    Log::Raw(songName);
+}
+
+inline void tDisplay::DisplayPlaylistScreen(const char* playlistName, tBatteryPercentage batteryPercentage, tVolumeValue volume) {
+    qDebug() << "bat:" << batteryPercentage;
+    qDebug() << "vol:" << volume;
+    Log::Raw(playlistName);
+}
+
 inline void tDisplay::DisplayInitialisationScreen() {}
+
 inline void tDisplay::DisplayMainMenuScreen() {}
+
 inline void tDisplay::DisplaySettingsScreen() {}
+
 inline void tDisplay::DisplayPedometerScreen(tStepCount steps) {}
+
 inline void tDisplay::DisplaySleepScreen() {}
+
 inline void tDisplay::DisplayErrorScreen() {}

@@ -38,9 +38,11 @@ class tMusicManager {
 
    private:
     tAudioPlayer audioPlayer_;
-    std::vector<tPlaylist*> playlists_;
 
-    std::vector<tPlaylist*>::iterator currentPlaylistItr_{playlists_.end()};
+    // Playlists are owned by value, and the position in them is an index rather
+    // than an iterator, so growing the vector cannot leave anything dangling.
+    std::vector<tPlaylist> playlists_;
+    size_t currentPlaylistIndex_{0};
 
     tVolume volume_;
     tVolumeValue volumeStep_{5};
@@ -55,9 +57,7 @@ class tMusicManager {
     bool IsCurrentSongLoaded();
 };
 
-inline tMusicManager::tMusicManager() {
-    // currentPlaylistItr_ = playlists_.end();
-}
+inline tMusicManager::tMusicManager() {}
 
 inline void tMusicManager::Update() {
     audioPlayer_.Update();
@@ -75,10 +75,10 @@ inline void tMusicManager::Update() {
 }
 
 inline tPlaylist* tMusicManager::CurrentPlaylist() {
-    if (currentPlaylistItr_ == playlists_.end()) {
+    if (currentPlaylistIndex_ >= playlists_.size()) {
         return nullptr;
     }
-    return *currentPlaylistItr_;
+    return &playlists_[currentPlaylistIndex_];
 }
 
 inline tSong* tMusicManager::CurrentSong() {
@@ -107,14 +107,14 @@ inline void tMusicManager::DecrementVolume() {
 
 inline bool tMusicManager::StartCurrentSong() {
     tSong* song = CurrentSong();
-    if (song == nullptr || song->File() == nullptr) {
+    if (song == nullptr) {
         Log::Warning("No song to play");
         isPlaying_ = false;
         return false;
     }
 
     PushVolume();
-    if (!audioPlayer_.Play(*song->File())) {
+    if (!audioPlayer_.Play(song->File())) {
         // Left stopped rather than skipped on, so a folder of unplayable files
         // cannot walk the whole playlist in one tick.
         isPlaying_ = false;
@@ -155,11 +155,11 @@ inline void tMusicManager::PreviousSong() {
 
 inline bool tMusicManager::IsCurrentSongLoaded() {
     tSong* song = CurrentSong();
-    if (song == nullptr || song->File() == nullptr) {
+    if (song == nullptr) {
         return false;
     }
     return std::strcmp(audioPlayer_.Source().GetFullPath(),
-                       song->File()->GetFullPath()) == 0;
+                       song->File().GetFullPath()) == 0;
 }
 
 // Starting playback outright, as opposed to PausePlaySong toggling it. Picking
@@ -197,39 +197,35 @@ inline void tMusicManager::PausePlaySong() {
 }
 
 inline void tMusicManager::NextPlaylist() {
-    if (currentPlaylistItr_ == playlists_.end()) {
-        Log::Error("Current Playlist Iterator invalid");
+    if (playlists_.empty()) {
+        Log::Error("No playlists to move through");
         return;
     }
 
-    ++currentPlaylistItr_;
-
-    if (currentPlaylistItr_ == playlists_.end()) {
-        currentPlaylistItr_ = playlists_.begin();
+    ++currentPlaylistIndex_;
+    if (currentPlaylistIndex_ >= playlists_.size()) {
+        currentPlaylistIndex_ = 0;
     }
 
     // If this operation takes too much time, we can make it happen after
     // playlist is selected and we are moving to the playing music menu.
-    tPlaylist* playlist = *currentPlaylistItr_;
-    playlist->LoadPlaylist();
+    playlists_[currentPlaylistIndex_].LoadPlaylist();
 }
 
 inline void tMusicManager::PreviousPlaylist() {
-    if (currentPlaylistItr_ == playlists_.end()) {
-        Log::Error("Current Playlist Iterator invalid");
+    if (playlists_.empty()) {
+        Log::Error("No playlists to move through");
         return;
     }
 
-    if (currentPlaylistItr_ == playlists_.begin()) {
-        currentPlaylistItr_ = playlists_.end();
+    if (currentPlaylistIndex_ == 0) {
+        currentPlaylistIndex_ = playlists_.size();
     }
-
-    --currentPlaylistItr_;
+    --currentPlaylistIndex_;
 
     // If this operation takes too much time, we can make it happen after
     // playlist is selected and we are moving to the playing music menu.
-    tPlaylist* playlist = *currentPlaylistItr_;
-    playlist->LoadPlaylist();
+    playlists_[currentPlaylistIndex_].LoadPlaylist();
 }
 
 inline void tMusicManager::SetVolumeStep(tVolumeValue step) {
@@ -242,21 +238,20 @@ inline void tMusicManager::SetVolumeStep(tVolumeValue step) {
 
 inline void tMusicManager::BuildPlaylists() {
     playlists_.clear();
-    currentPlaylistItr_ = playlists_.end();
+    currentPlaylistIndex_ = 0;
 
-    auto folders = fileManager.GetFoldersInFolder("/");
-    for (auto folder : folders) {
-        tPlaylist* p = new tPlaylist(folder);
-        playlists_.push_back(p);
-    }
+    fileManager.ForEachFolder(
+        "/",
+        [](const tFolder& folder, void* context) {
+            static_cast<std::vector<tPlaylist>*>(context)->emplace_back(folder);
+            return true;
+        },
+        &playlists_);
 
-    currentPlaylistItr_ = playlists_.begin();
-
-    if (currentPlaylistItr_ == playlists_.end()) {
+    if (playlists_.empty()) {
         Log::Warning("No playlists found on the card");
         return;
     }
 
-    tPlaylist* playlist = *currentPlaylistItr_;
-    playlist->LoadPlaylist();
+    playlists_[currentPlaylistIndex_].LoadPlaylist();
 }

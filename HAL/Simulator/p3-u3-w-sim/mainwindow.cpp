@@ -13,17 +13,23 @@ MainWindow::MainWindow(QWidget* parent)
     systemTimerElapsed.start();
     mainWindow = this;
 
-    tSystem* system = new tSystem();
+    system_ = std::make_unique<tSystem>();
 
     loopTimer.setTimerType(Qt::PreciseTimer);
     loopTimer.setInterval(1);
     QObject::connect(&loopTimer, &QTimer::timeout, this,
-                     [=]() { system->Update(); });
+                     [this]() { system_->Update(); });
 
     loopTimer.start();
 }
 
-MainWindow::~MainWindow() { delete ui; }
+MainWindow::~MainWindow() {
+    // The tick reaches into the widgets, so it has to be off before any of this
+    // is torn down.
+    loopTimer.stop();
+    system_.reset();
+    delete ui;
+}
 
 tDigitalValue HAL::ReadDigitalInput(HAL::eDigitalInput pin) {
     tDigitalValue value{};
