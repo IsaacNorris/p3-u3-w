@@ -73,6 +73,9 @@ CMakeLists.txt.user*
 *.dll
 *.exe
 
+# Simulator SD card content
+sdcard/
+
 # Directories with generated files
 .moc/
 .obj/

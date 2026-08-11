@@ -3,8 +3,10 @@
 #include "../HAL/Conversion.h"
 #include "../HAL/HAL.h"
 #include "Button.h"
+#include "FileManager.h"
 #include "Log.h"
 #include "MusicManager.h"
+#include "Display.h"
 
 class tSystem {
    public:
@@ -34,6 +36,7 @@ class tSystem {
     eSystemState systemState_{eSystemState::Initialization};
     tBatteryPercentage batteryPercentage_{};
     tMusicManager musicManager_{};
+    tDisplay display_;
 
     void SetState(eSystemState state);
 
@@ -76,7 +79,38 @@ inline void tSystem::UpdateBattery() {
         HAL::ReadAnalogInput(HAL::eAnalogInput::BatteryPercentage));
 }
 
-inline void tSystem::SetState(eSystemState state) { systemState_ = state; }
+inline void tSystem::SetState(eSystemState state) {
+    //log to see when we change state, could probably replace with display when working.
+    switch (state) {
+        case eSystemState::Initialization:
+            Log::Raw("Init");
+            break;
+        case eSystemState::MainPage:
+            Log::Raw("Main");
+            break;
+        case eSystemState::PlayingMusic:
+            Log::Raw("Music");
+            break;
+        case eSystemState::PlayListSelection:
+            Log::Raw("playlist");
+            break;
+        case eSystemState::Settings:
+            Log::Raw("Settings");
+            break;
+        case eSystemState::Pedometer:
+            Log::Raw("pedometer");
+            break;
+        case eSystemState::Sleep:
+            Log::Raw("sleep");
+            break;
+        case eSystemState::Error:
+            Log::Raw("Error");
+            break;
+    }
+
+
+    systemState_ = state;
+}
 
 //menu button is back button
 //playbutton is select button
@@ -116,12 +150,22 @@ inline void tSystem::UpdateSystem() {
 }
 
 inline void tSystem::SystemStateInitialization() {
+    display_.DisplayInitialisationScreen();
     Log::Custom("SystemState", "Init");
+
+    if (!fileManager.Mount()) {
+        Log::Error("Failed to mount the SD card");
+        SetState(eSystemState::Error);
+        return;
+    }
+
+    musicManager_.BuildPlaylists();
 
     SetState(eSystemState::MainPage);
 }
 
 inline void tSystem::SystemStateMainPage() {
+    display_.DisplayMainMenuScreen();
     Log::Custom("SystemState", "MainPage");
 
     if (buttonPlay_.IsReleased()) {
@@ -130,6 +174,8 @@ inline void tSystem::SystemStateMainPage() {
 }
 
 inline void tSystem::SystemStatePlayingMusic() {
+    tSong* song = musicManager_.CurrentSong();
+    display_.DisplayMusicPlayingScreen(song == nullptr ? "" : song->SongName(), batteryPercentage_, musicManager_.Volume());
     Log::Custom("SystemState", "PlayingMusic");
 
     if (buttonMenu_.IsReleased()) {
@@ -139,10 +185,10 @@ inline void tSystem::SystemStatePlayingMusic() {
         musicManager_.PausePlaySong();
     }
     if (buttonVolumeUp_.IsReleased()) {
-        musicManager_.DecrementVolume();
+        musicManager_.IncrementVolume();
     }
     if (buttonVolumeDown_.IsReleased()) {
-        musicManager_.IncrementVolume();
+        musicManager_.DecrementVolume();
     }
     if (buttonNext_.IsReleased()) {
         musicManager_.NextSong();
@@ -153,19 +199,23 @@ inline void tSystem::SystemStatePlayingMusic() {
 }
 
 inline void tSystem::SystemStatePlayListSelection() {
+    tPlaylist* playlist = musicManager_.CurrentPlaylist();
+    display_.DisplayPlaylistScreen(playlist == nullptr ? "" : playlist->PlaylistName(), batteryPercentage_, musicManager_.Volume());
     Log::Custom("SystemState", "PlaylistSelection");
 
     if (buttonMenu_.IsReleased()) {
         SetState(eSystemState::MainPage);
     }
     if (buttonPlay_.IsReleased()) {
+        // Selecting a playlist is what starts it playing.
+        musicManager_.PlaySong();
         SetState(eSystemState::PlayingMusic);
     }
     if (buttonVolumeUp_.IsReleased()) {
-        musicManager_.DecrementVolume();
+        musicManager_.IncrementVolume();
     }
     if (buttonVolumeDown_.IsReleased()) {
-        musicManager_.IncrementVolume();
+        musicManager_.DecrementVolume();
     }
     if (buttonNext_.IsReleased()) {
         musicManager_.NextPlaylist();
@@ -176,6 +226,7 @@ inline void tSystem::SystemStatePlayListSelection() {
 }
 
 inline void tSystem::SystemStateSettings() {
+    display_.DisplaySettingsScreen();
     Log::Custom("SystemState", "Setting");
 
     if (buttonMenu_.IsReleased()) {
@@ -184,9 +235,16 @@ inline void tSystem::SystemStateSettings() {
 }
 
 inline void tSystem::SystemStatePedometer() {
+    // display_.DisplayPedometerScreen(pedometer_.Steps());
     Log::Custom("SystemState", "Pedometer");
 }
 
-inline void tSystem::SystemStateSleep() { Log::Custom("SystemState", "Sleep"); }
+inline void tSystem::SystemStateSleep() {
+    display_.DisplaySleepScreen();
+    Log::Custom("SystemState", "Sleep");
+}
 
-inline void tSystem::SystemStateError() { Log::Error("SystemState"); }
+inline void tSystem::SystemStateError() {
+    display_.DisplayErrorScreen();
+    Log::Error("SystemState");
+}

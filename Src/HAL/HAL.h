@@ -7,6 +7,7 @@ using tVoltage = float;
 using tDigitalValue = bool;
 using tBatteryPercentage = uint8_t;
 using tVolumeValue = uint8_t;
+using tStepCount = uint32_t;
 
 class HAL {
    public:

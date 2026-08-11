@@ -7,6 +7,8 @@
 #include "FileManager.h"
 #include "Log.h"
 
+inline constexpr char AudioFileExtension[] = "mp3";
+
 class tSong {
    public:
     tSong(tFile* file);
@@ -38,9 +40,9 @@ class tPlaylist {
 
    private:
     std::vector<tSong*> songs_;
-    std::vector<tSong*>::iterator currentSongItr_ {songs_.end()};
+    std::vector<tSong*>::iterator currentSongItr_{songs_.end()};
 
-    tFolder* folder_ {};
+    tFolder* folder_{};
 
     bool playlistLoaded_{false};
 };
@@ -48,6 +50,9 @@ class tPlaylist {
 inline tPlaylist::tPlaylist(tFolder* folder) : folder_(folder) {}
 
 inline tSong* tPlaylist::CurrentSong() {
+    if (currentSongItr_ == songs_.end()) {
+        return nullptr;
+    }
     return *currentSongItr_;
 }
 
@@ -56,25 +61,25 @@ inline const char* tPlaylist::PlaylistName() {
 }
 
 inline void tPlaylist::NextSong() {
-    if(currentSongItr_ == songs_.end()){
+    if (currentSongItr_ == songs_.end()) {
         Log::Error("Current Song Iterator invalid");
         return;
     }
 
     ++currentSongItr_;
 
-    if(currentSongItr_ == songs_.end()){
+    if (currentSongItr_ == songs_.end()) {
         currentSongItr_ = songs_.begin();
     }
 }
 
 inline void tPlaylist::PreviousSong() {
-    if(currentSongItr_ == songs_.end()){
+    if (currentSongItr_ == songs_.end()) {
         Log::Error("Current Song Iterator invalid");
         return;
     }
 
-    if(currentSongItr_ == songs_.begin()){
+    if (currentSongItr_ == songs_.begin()) {
         currentSongItr_ = songs_.end();
     }
 
@@ -88,13 +93,14 @@ inline void tPlaylist::LoadPlaylist() {
 
     songs_.clear();
     currentSongItr_ = songs_.end();
-    std::vector<tFile*> files = fileManager.GetFiles(folder_->GetFullPath());
+    std::vector<tFile*> files =
+        fileManager.GetFilesInFolder(folder_->GetFullPath(), AudioFileExtension);
 
     for (tFile* file : files) {
         songs_.push_back(new tSong(file));
     }
 
-    //TODO: find a better way of tracking success;
+    // TODO: find a better way of tracking success;
     success = true;
 
     playlistLoaded_ = success;

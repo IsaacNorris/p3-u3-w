@@ -1,10 +1,11 @@
 #pragma once
 
+#include <cstring>
+#include <vector>
+
 #include "AudioPlayer.h"
 #include "FileManager.h"
 #include "Song.h"
-
-#include <vector>
 
 class tMusicManager {
    public:
@@ -15,28 +16,43 @@ class tMusicManager {
     tPlaylist* CurrentPlaylist();
     tSong* CurrentSong();
 
+    tVolumeValue Volume();
     void IncrementVolume();
     void DecrementVolume();
     void NextSong();
     void PreviousSong();
+    void PlaySong();
     void PausePlaySong();
     void NextPlaylist();
     void PreviousPlaylist();
 
     void SetVolumeStep(tVolumeValue step);
 
+    bool IsPlaying() const { return isPlaying_; }
+    uint32_t SongPositionMs() const { return audioPlayer_.PositionMs(); }
+    uint32_t SongDurationMs() const { return audioPlayer_.DurationMs(); }
+
+    // We gotta be careful with the dynamic allocation, so this should only ever
+    // be called on startup, once the card is mounted.
+    void BuildPlaylists();
+
    private:
     tAudioPlayer audioPlayer_;
     std::vector<tPlaylist*> playlists_;
 
-    std::vector<tPlaylist*>::iterator currentPlaylistItr_ {playlists_.end()};
+    std::vector<tPlaylist*>::iterator currentPlaylistItr_{playlists_.end()};
 
     tVolume volume_;
     tVolumeValue volumeStep_{5};
 
-    bool isPlaying_ {false};
+    // What the user last asked for, which is not the same as what the player is
+    // doing: a song that has played out leaves this set so the next one starts
+    // on its own.
+    bool isPlaying_{false};
 
-    void BuildPlaylists();
+    bool StartCurrentSong();
+    void PushVolume();
+    bool IsCurrentSongLoaded();
 };
 
 inline tMusicManager::tMusicManager() {
@@ -44,67 +60,174 @@ inline tMusicManager::tMusicManager() {
 }
 
 inline void tMusicManager::Update() {
-    //where we will put the actual interface to the audio
-    // i.e. the WRITE
+    audioPlayer_.Update();
+
+    // A song playing itself out is the only thing that moves the playlist on
+    // without the user asking.
+    if (isPlaying_ && audioPlayer_.IsFinished()) {
+        NextSong();
+
+        // Still finished means nothing started, so stop asking every tick.
+        if (audioPlayer_.IsFinished()) {
+            isPlaying_ = false;
+        }
+    }
 }
 
-inline tPlaylist* tMusicManager::CurrentPlaylist(){
+inline tPlaylist* tMusicManager::CurrentPlaylist() {
+    if (currentPlaylistItr_ == playlists_.end()) {
+        return nullptr;
+    }
     return *currentPlaylistItr_;
 }
 
-inline tSong* tMusicManager::CurrentSong(){
-    tPlaylist* playlist = *currentPlaylistItr_;
+inline tSong* tMusicManager::CurrentSong() {
+    tPlaylist* playlist = CurrentPlaylist();
+    if (playlist == nullptr) {
+        return nullptr;
+    }
     return playlist->CurrentSong();
 }
 
-inline void tMusicManager::IncrementVolume() { volume_ + volumeStep_; }
+inline tVolumeValue tMusicManager::Volume() { return volume_.Volume(); }
 
-inline void tMusicManager::DecrementVolume() { volume_ - volumeStep_; }
+inline void tMusicManager::PushVolume() {
+    audioPlayer_.SetVolume(volume_.Volume());
+}
 
-inline void tMusicManager::NextSong(){
-    tPlaylist* playlist = *currentPlaylistItr_;
+inline void tMusicManager::IncrementVolume() {
+    volume_ += volumeStep_;
+    PushVolume();
+}
+
+inline void tMusicManager::DecrementVolume() {
+    volume_ -= volumeStep_;
+    PushVolume();
+}
+
+inline bool tMusicManager::StartCurrentSong() {
+    tSong* song = CurrentSong();
+    if (song == nullptr || song->File() == nullptr) {
+        Log::Warning("No song to play");
+        isPlaying_ = false;
+        return false;
+    }
+
+    PushVolume();
+    if (!audioPlayer_.Play(*song->File())) {
+        // Left stopped rather than skipped on, so a folder of unplayable files
+        // cannot walk the whole playlist in one tick.
+        isPlaying_ = false;
+        return false;
+    }
+
+    isPlaying_ = true;
+    return true;
+}
+
+inline void tMusicManager::NextSong() {
+    tPlaylist* playlist = CurrentPlaylist();
+    if (playlist == nullptr) {
+        Log::Error("Current Playlist Iterator invalid");
+        return;
+    }
+
     playlist->NextSong();
+
+    if (isPlaying_) {
+        StartCurrentSong();
+    }
 }
 
-inline void tMusicManager::PreviousSong(){
-    tPlaylist* playlist = *currentPlaylistItr_;
+inline void tMusicManager::PreviousSong() {
+    tPlaylist* playlist = CurrentPlaylist();
+    if (playlist == nullptr) {
+        Log::Error("Current Playlist Iterator invalid");
+        return;
+    }
+
     playlist->PreviousSong();
+
+    if (isPlaying_) {
+        StartCurrentSong();
+    }
 }
 
-inline void tMusicManager::PausePlaySong() { isPlaying_ = !isPlaying_; }
+inline bool tMusicManager::IsCurrentSongLoaded() {
+    tSong* song = CurrentSong();
+    if (song == nullptr || song->File() == nullptr) {
+        return false;
+    }
+    return std::strcmp(audioPlayer_.Source().GetFullPath(),
+                       song->File()->GetFullPath()) == 0;
+}
 
-inline void tMusicManager::NextPlaylist(){
-    if(currentPlaylistItr_ == playlists_.end()){
+// Starting playback outright, as opposed to PausePlaySong toggling it. Picking
+// a playlist and then pressing play should get you the song the playlist is
+// sitting on, not a pause.
+inline void tMusicManager::PlaySong() {
+    if (audioPlayer_.IsPaused() && IsCurrentSongLoaded()) {
+        audioPlayer_.Resume();
+        isPlaying_ = true;
+        return;
+    }
+
+    if (audioPlayer_.IsPlaying() && IsCurrentSongLoaded()) {
+        return;
+    }
+
+    StartCurrentSong();
+}
+
+inline void tMusicManager::PausePlaySong() {
+    if (audioPlayer_.IsPaused()) {
+        audioPlayer_.Resume();
+        isPlaying_ = true;
+        return;
+    }
+
+    if (audioPlayer_.IsActive()) {
+        audioPlayer_.Pause();
+        isPlaying_ = false;
+        return;
+    }
+
+    // Nothing loaded, or the last song ran out with playback switched off.
+    StartCurrentSong();
+}
+
+inline void tMusicManager::NextPlaylist() {
+    if (currentPlaylistItr_ == playlists_.end()) {
         Log::Error("Current Playlist Iterator invalid");
         return;
     }
 
     ++currentPlaylistItr_;
 
-    if(currentPlaylistItr_ == playlists_.end()){
+    if (currentPlaylistItr_ == playlists_.end()) {
         currentPlaylistItr_ = playlists_.begin();
     }
 
-    //If this operation takes too much time, we can make it happen after playlist is selected
-    //and we are moving to the playing music menu.
+    // If this operation takes too much time, we can make it happen after
+    // playlist is selected and we are moving to the playing music menu.
     tPlaylist* playlist = *currentPlaylistItr_;
     playlist->LoadPlaylist();
 }
 
-inline void tMusicManager::PreviousPlaylist(){
-    if(currentPlaylistItr_ == playlists_.end()){
+inline void tMusicManager::PreviousPlaylist() {
+    if (currentPlaylistItr_ == playlists_.end()) {
         Log::Error("Current Playlist Iterator invalid");
         return;
     }
 
-    if(currentPlaylistItr_ == playlists_.begin()){
+    if (currentPlaylistItr_ == playlists_.begin()) {
         currentPlaylistItr_ = playlists_.end();
     }
 
     --currentPlaylistItr_;
 
-    //If this operation takes too much time, we can make it happen after playlist is selected
-    //and we are moving to the playing music menu.
+    // If this operation takes too much time, we can make it happen after
+    // playlist is selected and we are moving to the playing music menu.
     tPlaylist* playlist = *currentPlaylistItr_;
     playlist->LoadPlaylist();
 }
@@ -117,17 +240,23 @@ inline void tMusicManager::SetVolumeStep(tVolumeValue step) {
     volumeStep_ = step;
 }
 
-// we gotta be careful with the dynamic allocation.
-// this function should only ever be called on startup.
-inline void tMusicManager::BuildPlaylists(){
+inline void tMusicManager::BuildPlaylists() {
     playlists_.clear();
     currentPlaylistItr_ = playlists_.end();
 
-    auto folders = fileManager.GetFolders();
-    for(auto folder : folders){
+    auto folders = fileManager.GetFoldersInFolder("/");
+    for (auto folder : folders) {
         tPlaylist* p = new tPlaylist(folder);
         playlists_.push_back(p);
     }
 
     currentPlaylistItr_ = playlists_.begin();
+
+    if (currentPlaylistItr_ == playlists_.end()) {
+        Log::Warning("No playlists found on the card");
+        return;
+    }
+
+    tPlaylist* playlist = *currentPlaylistItr_;
+    playlist->LoadPlaylist();
 }

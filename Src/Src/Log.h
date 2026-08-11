@@ -6,7 +6,7 @@ static constexpr bool LogInfo = true;
 static constexpr bool LogError = true;
 static constexpr bool LogWarning = true;
 static constexpr bool LogDebug = true;
-static constexpr bool LogCustom = true;
+static constexpr bool LogCustom = false;
 static constexpr bool LogRaw = true;
 
 class Log {

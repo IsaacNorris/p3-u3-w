@@ -59,7 +59,7 @@ tVoltage HAL::ReadAnalogInput(HAL::eAnalogInput pin) {
         case HAL::eAnalogInput::BatteryPercentage:
             voltage = mainWindow->ui->s_battery->value() / 3;
             voltage /= 10;
-            qDebug() << voltage;
+            // qDebug() << voltage;
             break;
     }
 
