@@ -24,7 +24,6 @@ HEADERS += \
     ../../../ThirdParty/minimp3/minimp3.h \
     ../../../Src/Drivers/AudioDriver.h \
     ../../../Src/Drivers/BluetoothDriver.h \
-    ../../../Src/Drivers/DisplayDriver.h \
     ../../../Src/Drivers/IMUDriver.h \
     ../../../Src/Drivers/SDCardDriver.h \
     ../../../Src/HAL/Conversion.h \
