@@ -185,7 +185,7 @@ inline void tSystem::SystemStatePlayingMusic() {
         SetState(eSystemState::PlayListSelection);
     }
     if (buttonPlay_.IsReleased()) {
-        // musicManager_.PausePlaySong();
+        musicManager_.PausePlaySong();
     }
     if (buttonVolumeUp_.IsReleased()) {
         musicManager_.IncrementVolume();

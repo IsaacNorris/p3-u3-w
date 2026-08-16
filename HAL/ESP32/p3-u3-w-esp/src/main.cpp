@@ -102,7 +102,7 @@ tVoltage HAL::ReadAnalogInput(HAL::eAnalogInput pin) {
 
     switch (pin) {
         case HAL::eAnalogInput::BatteryPercentage:
-            value = 2.5;  // Placeholder value for battery percentage
+            value = 2.0;  // Placeholder value for battery percentage
             break;
     }
 
