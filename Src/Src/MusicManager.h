@@ -62,6 +62,15 @@ inline tMusicManager::tMusicManager() {}
 inline void tMusicManager::Update() {
     audioPlayer_.Update();
 
+    // The player gave up on the file. Stopped rather than skipped on, for the
+    // same reason a file that will not open is: whatever broke this read is
+    // likely to break the next song's too.
+    if (isPlaying_ && audioPlayer_.IsError()) {
+        Log::Error("Playback stopped, the audio stream failed");
+        isPlaying_ = false;
+        return;
+    }
+
     // A song playing itself out is the only thing that moves the playlist on
     // without the user asking.
     if (isPlaying_ && audioPlayer_.IsFinished()) {

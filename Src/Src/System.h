@@ -3,10 +3,10 @@
 #include "../HAL/Conversion.h"
 #include "../HAL/HAL.h"
 #include "Button.h"
+#include "Display.h"
 #include "FileManager.h"
 #include "Log.h"
 #include "MusicManager.h"
-#include "Display.h"
 
 class tSystem {
    public:
@@ -37,6 +37,7 @@ class tSystem {
     tBatteryPercentage batteryPercentage_{};
     tMusicManager musicManager_{};
     tDisplay display_;
+    tTimeMs lastMountRetryMs_{0};
 
     void SetState(eSystemState state);
 
@@ -80,7 +81,8 @@ inline void tSystem::UpdateBattery() {
 }
 
 inline void tSystem::SetState(eSystemState state) {
-    //log to see when we change state, could probably replace with display when working.
+    // log to see when we change state, could probably replace with display when
+    // working.
     switch (state) {
         case eSystemState::Initialization:
             Log::Raw("Init");
@@ -108,17 +110,16 @@ inline void tSystem::SetState(eSystemState state) {
             break;
     }
 
-
     systemState_ = state;
 }
 
-//menu button is back button
-//playbutton is select button
-//Next Previous are selection(next and previous)
-//volume buttons should be always volume control.
+// menu button is back button
+// playbutton is select button
+// Next Previous are selection(next and previous)
+// volume buttons should be always volume control.
 
-//Battery, Volume should always be on display.
-//maybe time <- if its accurate.
+// Battery, Volume should always be on display.
+// maybe time <- if its accurate.
 
 inline void tSystem::UpdateSystem() {
     switch (systemState_) {
@@ -175,14 +176,16 @@ inline void tSystem::SystemStateMainPage() {
 
 inline void tSystem::SystemStatePlayingMusic() {
     tSong* song = musicManager_.CurrentSong();
-    display_.DisplayMusicPlayingScreen(song == nullptr ? "" : song->SongName(), batteryPercentage_, musicManager_.Volume());
+    display_.DisplayMusicPlayingScreen(song == nullptr ? "" : song->SongName(),
+                                       batteryPercentage_,
+                                       musicManager_.Volume());
     Log::Custom("SystemState", "PlayingMusic");
 
     if (buttonMenu_.IsReleased()) {
         SetState(eSystemState::PlayListSelection);
     }
     if (buttonPlay_.IsReleased()) {
-        musicManager_.PausePlaySong();
+        // musicManager_.PausePlaySong();
     }
     if (buttonVolumeUp_.IsReleased()) {
         musicManager_.IncrementVolume();
@@ -200,7 +203,9 @@ inline void tSystem::SystemStatePlayingMusic() {
 
 inline void tSystem::SystemStatePlayListSelection() {
     tPlaylist* playlist = musicManager_.CurrentPlaylist();
-    display_.DisplayPlaylistScreen(playlist == nullptr ? "" : playlist->PlaylistName(), batteryPercentage_, musicManager_.Volume());
+    display_.DisplayPlaylistScreen(
+        playlist == nullptr ? "" : playlist->PlaylistName(), batteryPercentage_,
+        musicManager_.Volume());
     Log::Custom("SystemState", "PlaylistSelection");
 
     if (buttonMenu_.IsReleased()) {
@@ -246,5 +251,21 @@ inline void tSystem::SystemStateSleep() {
 
 inline void tSystem::SystemStateError() {
     display_.DisplayErrorScreen();
-    Log::Error("SystemState");
+
+    // A card that was not ready on the first tick often is a second later, and
+    // sitting in Error forever for that is worse than trying again. Kept slow
+    // because a failed begin that is retried every couple of seconds never
+    // gives the card a chance to see an idle bus.
+    const tTimeMs now = HAL::GetCurrentTimeMs();
+    if (lastMountRetryMs_ != 0 && (now - lastMountRetryMs_) < 15000) {
+        return;
+    }
+    lastMountRetryMs_ = now;
+
+    if (!fileManager.Mount()) {
+        return;
+    }
+
+    musicManager_.BuildPlaylists();
+    SetState(eSystemState::MainPage);
 }

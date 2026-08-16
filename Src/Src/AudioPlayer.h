@@ -70,6 +70,14 @@ inline constexpr unsigned AudioPrimePercent = 75;
 // real length.
 inline constexpr uint32_t AudioDurationEstimateFrames = 88200;
 
+// Consecutive card reads that came back with nothing while the file still had
+// bytes to go. The driver retries and remounts underneath this, so by the time
+// it has failed this many times in a row the card is not coming back and the
+// song is better given up on than left ticking in silence forever. Kept low
+// because a read against a card that has stopped answering does not fail fast:
+// it costs a 500 ms select timeout, and the driver's retry can cost another.
+inline constexpr uint8_t AudioMaxStalledReads = 4;
+
 // Decode attempts per tick, not frames: most attempts that produce nothing are
 // eating an ID3 tag or resyncing, and those should not cost a whole tick each.
 // Only one frame can be staged at a time, so a tick decodes at most one frame.
@@ -196,10 +204,12 @@ class tAudioPlayer {
     bool decoderDone_{true};
     bool formatConfirmed_{false};
     bool starved_{false};
+    uint8_t stalledReads_{0};
 
     tSampleRate sampleRate_{0};
     uint8_t channels_{0};
     uint32_t fileBytes_{0};
+    uint32_t streamBytes_{0};
     uint32_t durationMs_{0};
     uint32_t framesWritten_{0};
     uint32_t underruns_{0};
@@ -260,7 +270,9 @@ inline void tAudioPlayer::Release() {
     decoderDone_ = true;
     formatConfirmed_ = false;
     starved_ = false;
+    stalledReads_ = 0;
     fileBytes_ = 0;
+    streamBytes_ = 0;
     durationMs_ = 0;
     framesWritten_ = 0;
     decodedBytes_ = 0;
@@ -297,7 +309,17 @@ inline bool tAudioPlayer::Play(const tFile& file) {
     }
 
     source_ = file;
+
+    // The size is taken once, here, where the handle is known good. Everything
+    // after this judges the end of the file against it rather than asking the
+    // handle again, so a card that drops off mid song cannot answer zero and
+    // have the song read as finished.
     fileBytes_ = stream_.Size();
+    if (fileBytes_ == 0) {
+        Fail("The audio file is empty");
+        return false;
+    }
+
     decoder_->Reset();
     endOfFile_ = false;
     decoderDone_ = false;
@@ -336,6 +358,14 @@ inline void tAudioPlayer::TogglePause() {
 }
 
 inline void tAudioPlayer::Update() {
+    // The card has stopped giving up bytes with the file unfinished. Ticking
+    // will not bring it back, and the states below have no way out on their
+    // own, so the song ends here.
+    if (stalledReads_ >= AudioMaxStalledReads) {
+        Fail("Lost the audio file mid stream");
+        return;
+    }
+
     switch (state_) {
         case eState::Priming:
             PumpPriming();
@@ -418,10 +448,25 @@ inline void tAudioPlayer::FillInput() {
         (space < AudioReadChunkBytes) ? space : AudioReadChunkBytes;
     const size_t read = stream_.Read(input_.WritePointer(), wanted);
     input_.CommitWrite(read);
+    streamBytes_ += static_cast<uint32_t>(read);
 
-    // A short read is the only end of file either file system reports.
+    if (read != 0) {
+        stalledReads_ = 0;
+    }
+
+    // A short read is end of file only when the file has actually run out, and
+    // that is judged against what has been read rather than against the
+    // handle's own position, because a handle whose card has gone away reports
+    // both its position and its size as zero. Zero of zero reads as a file that
+    // has finished, which ends the song cleanly, walks the playlist on and has
+    // the whole folder opened one track at a time against a card that is still
+    // broken. A read of nothing with bytes still to go is a stall instead.
     if (read < wanted) {
-        endOfFile_ = true;
+        if (streamBytes_ >= fileBytes_) {
+            endOfFile_ = true;
+        } else if (read == 0) {
+            ++stalledReads_;
+        }
     }
 }
 
@@ -581,6 +626,7 @@ inline void tAudioPlayer::PumpPriming() {
     const tFrameCount target = driver_.RingFrames() * AudioPrimePercent / 100;
     if (driver_.QueuedFrames() >= target || decoderDone_) {
         driver_.Resume();
+        Log::Info("Audio primed, playing");
         state_ = eState::Playing;
     }
 }
