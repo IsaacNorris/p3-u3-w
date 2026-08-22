@@ -1,5 +1,6 @@
 #include "../../../../Src/Drivers/AudioDriver.h"
 
+#include <Arduino.h>
 #include <cstdio>
 #include <driver/dac.h>
 #include <driver/i2s.h>
@@ -17,17 +18,26 @@ namespace {
 
 constexpr i2s_port_t Port = I2S_NUM_0;
 
-// 8 x 256 frames is 2048 frames, about 46 ms at 44.1 kHz, matching the ring the
-// simulator runs so a tick that is long enough to be heard there is long enough
-// to be heard here.
-constexpr int DmaBufferCount = 8;
-constexpr tFrameCount DmaBufferFrames = 256;
-constexpr tFrameCount RingCapacityFrames = DmaBufferCount * DmaBufferFrames;
+// 16 x 512 frames is AudioRingFrames (8192), about 186 ms at 44.1 kHz. That is
+// long enough for a 40 Hz tick on a 40-64 MHz core, where one MPEG frame is
+// 26 ms and the rest of the superloop can take longer than that.
+constexpr int DmaBufferCount = 16;
+constexpr tFrameCount DmaBufferFrames = 512;
+static_assert(DmaBufferCount * DmaBufferFrames == AudioRingFrames,
+              "ESP32 DMA chain must match AudioRingFrames");
 
 bool installed = false;
 bool paused = false;
 tSampleRate activeSampleRate = 0;
 uint8_t activeChannels = 0;
+uint32_t cpuMhzBeforeI2s = 0;
+
+// Original ESP32 I2S clocks from PLL_D2 (160 MHz). setCpuFrequencyMhz(40)
+// switches the CPU to XTAL and rtc_clk_cpu_freq_set_config powers that PLL
+// down, so BCK never toggles, i2s_write fills DMA that never plays, and
+// AgeQueue still counts the ring out as if it had. 80 MHz is the lowest
+// Arduino clock that keeps the PLL on. STM32 SAI is not limited this way.
+constexpr uint32_t I2sMinCpuMhz = 80;
 
 // What has been handed to the DMA and not yet played. The legacy I2S driver
 // will not say how much of the chain is still pending, so it is tracked here
@@ -72,6 +82,32 @@ void AgeQueue() {
     queuedFrames = (played >= queuedFrames)
                        ? 0
                        : queuedFrames - static_cast<tFrameCount>(played);
+}
+
+void EnsureI2sPll() {
+    const uint32_t cpu = getCpuFrequencyMhz();
+    if (cpu >= I2sMinCpuMhz) {
+        return;
+    }
+
+    cpuMhzBeforeI2s = cpu;
+    setCpuFrequencyMhz(I2sMinCpuMhz);
+
+    char message[96];
+    std::snprintf(
+        message, sizeof(message),
+        "CPU raised from %u MHz to %u MHz; I2S needs the PLL that 40 MHz turns off",
+        static_cast<unsigned>(cpu), static_cast<unsigned>(I2sMinCpuMhz));
+    Log::Warning(message);
+}
+
+void RestoreCpuIfRaised() {
+    if (cpuMhzBeforeI2s == 0) {
+        return;
+    }
+
+    setCpuFrequencyMhz(cpuMhzBeforeI2s);
+    cpuMhzBeforeI2s = 0;
 }
 
 bool Install(tSampleRate sampleRate, uint8_t channels) {
@@ -133,7 +169,9 @@ bool tAudioDriver::Start(tSampleRate sampleRate, uint8_t channels) {
     }
 
     if (!installed) {
+        EnsureI2sPll();
         if (!Install(sampleRate, channels)) {
+            RestoreCpuIfRaised();
             return false;
         }
         installed = true;
@@ -182,6 +220,7 @@ void tAudioDriver::Stop() {
     activeSampleRate = 0;
     activeChannels = 0;
     queuedFrames = 0;
+    RestoreCpuIfRaised();
 }
 
 bool tAudioDriver::IsRunning() const { return installed; }
@@ -206,6 +245,9 @@ tFrameCount tAudioDriver::Write(const tPcmSample* interleaved,
 
     const tFrameCount written = bytesWritten / FrameBytes();
     queuedFrames += written;
+    if (queuedFrames > AudioRingFrames) {
+        queuedFrames = AudioRingFrames;
+    }
     return written;
 }
 
@@ -214,7 +256,9 @@ tFrameCount tAudioDriver::FreeFrames() const {
         return 0;
     }
     AgeQueue();
-    return RingCapacityFrames - queuedFrames;
+    return (queuedFrames >= AudioRingFrames)
+               ? 0
+               : AudioRingFrames - queuedFrames;
 }
 
 tFrameCount tAudioDriver::QueuedFrames() const {
@@ -225,7 +269,7 @@ tFrameCount tAudioDriver::QueuedFrames() const {
     return queuedFrames;
 }
 
-tFrameCount tAudioDriver::RingFrames() const { return RingCapacityFrames; }
+tFrameCount tAudioDriver::RingFrames() const { return AudioRingFrames; }
 
 void tAudioDriver::Pause() {
     if (!installed || paused) {

@@ -42,8 +42,8 @@ enum class eState : uint8_t {
 eState state = eState::Untried;
 
 // What is already on the panel. The screens are redrawn from the superloop on
-// every tick, and pushing 512 bytes over I2C takes about 13 ms, which is a
-// third of the audio ring. So a screen that has not changed is not sent.
+// every tick, and pushing 512 bytes over I2C takes about 13 ms. So a screen
+// that has not changed is not sent.
 char onScreen[BodyChars + LineChars + 2] = {};
 
 bool Ready() {

@@ -3,6 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 
 #include "../Drivers/AudioDriver.h"
 #include "../Drivers/SDCardDriver.h"
@@ -52,13 +53,12 @@ struct tVolume {
 // never split across a refill and the card is still read in whole blocks.
 inline constexpr size_t AudioInputBufferBytes = 4096;
 
-// One card read per tick, so this doubles as the ceiling on how fast a file can
-// be pulled in. Sized for the uncompressed case: WAV at 44.1 kHz stereo eats
-// 176 KB/s against MP3's 16 KB/s, so a 1 KB chunk would leave WAV with almost no
-// margin on a loop that ticks slower than a couple of milliseconds. Four blocks
-// is still a short enough read to not hold up the display, which shares the
-// superloop.
-inline constexpr size_t AudioReadChunkBytes = 2048;
+// One card read per decode attempt, so this doubles as the ceiling on how fast
+// a file can be pulled in. Sized for the uncompressed case: WAV at 44.1 kHz
+// stereo eats 176 KB/s against MP3's 16 KB/s, and a slow 40 Hz tick has to take
+// in more than 25 ms of it or the ring never refills. Eight blocks is still a
+// short enough read to not hold up the display, which shares the superloop.
+inline constexpr size_t AudioReadChunkBytes = 4096;
 
 // How full the platform ring is made before playback is unpaused. Priming is
 // the difference between a song starting cleanly and starting with a stutter.
@@ -78,11 +78,23 @@ inline constexpr uint32_t AudioDurationEstimateFrames = 88200;
 // it costs a 500 ms select timeout, and the driver's retry can cost another.
 inline constexpr uint8_t AudioMaxStalledReads = 4;
 
-// Decode attempts per tick, not frames: most attempts that produce nothing are
-// eating an ID3 tag or resyncing, and those should not cost a whole tick each.
-// Only one frame can be staged at a time, so a tick decodes at most one frame.
-inline constexpr uint8_t AudioDecodeAttemptsPerTick = 4;
-inline constexpr uint8_t AudioDecodeAttemptsWhilePriming = 16;
+// MP3 frames to decode and push in one tick. One MPEG1 frame is 26 ms at
+// 44.1 kHz, so a single frame per tick falls behind as soon as Update takes
+// longer than that, which it does at 40-80 MHz once the display or the card
+// joins in. Eight frames is about 210 ms, enough to fill AudioRingFrames after
+// a stall and still faster than realtime on a 40 MHz core. Priming spends more
+// so the software PCM buffer is actually full before I2S is started.
+inline constexpr uint8_t AudioFramesPerTick = 8;
+inline constexpr uint8_t AudioFramesWhilePriming = 16;
+
+// Decoded PCM held in the player, separate from the DMA ring. Priming fills
+// this with I2S still stopped, then bursts it into the DMA in one go. Starting
+// I2S first and writing while it consumes cannot fill the ring on a 40 MHz
+// core: decode of one frame takes longer than the 26 ms it produces, so the
+// DMA is empty by the time playback is "primed".
+inline constexpr tFrameCount AudioPcmBufferFrames = AudioRingFrames;
+static_assert(AudioPcmBufferFrames >= MaxDecodedFrames,
+              "PCM staging must hold at least one decoded frame");
 
 // Streams one file at a time from the card, through a decoder, into the audio
 // driver. Everything is sized up front and nothing here allocates, so the only
@@ -167,10 +179,11 @@ class tAudioPlayer {
     void PumpDraining();
 
     void FillInput();
+    void CompactPcm();
     void PumpDecode(uint8_t attempts);
     void PumpOutput();
 
-    void ApplyGain(tFrameCount frames, uint8_t channels);
+    void ApplyGain(tPcmSample* samples, size_t count);
     void UpdateDuration();
 
     // Lets go of the file and what was buffered from it but leaves the output
@@ -192,7 +205,7 @@ class tAudioPlayer {
     tAudioDecoder* decoder_{nullptr};
 
     tStreamBuffer<AudioInputBufferBytes> input_;
-    std::array<tPcmSample, MaxDecodedFrames * MaxAudioChannels> pcm_{};
+    std::array<tPcmSample, AudioPcmBufferFrames * MaxAudioChannels> pcm_{};
     tFrameCount pcmFrames_{0};
     tFrameCount pcmWritten_{0};
 
@@ -470,18 +483,49 @@ inline void tAudioPlayer::FillInput() {
     }
 }
 
+inline void tAudioPlayer::CompactPcm() {
+    if (pcmWritten_ == 0) {
+        return;
+    }
+
+    const tFrameCount keep = pcmFrames_ - pcmWritten_;
+    const uint8_t channels = (channels_ != 0)
+                                 ? channels_
+                                 : (decoder_ != nullptr ? decoder_->StreamInfo().channels
+                                                        : 0);
+    if (keep != 0 && channels != 0) {
+        std::memmove(pcm_.data(), pcm_.data() + (pcmWritten_ * channels),
+                     keep * channels * sizeof(tPcmSample));
+    }
+
+    pcmFrames_ = keep;
+    pcmWritten_ = 0;
+}
+
 inline void tAudioPlayer::PumpDecode(uint8_t attempts) {
-    while (attempts != 0 && pcmFrames_ == 0 && !decoderDone_) {
+    while (attempts != 0 && !decoderDone_) {
         --attempts;
+
+        if (AudioPcmBufferFrames - pcmFrames_ < MaxDecodedFrames) {
+            CompactPcm();
+            if (AudioPcmBufferFrames - pcmFrames_ < MaxDecodedFrames) {
+                return;
+            }
+        }
 
         const size_t before = input_.Available();
         FillInput();
+
+        const uint8_t channels = decoder_->StreamInfo().channels;
+        tPcmSample* dest =
+            pcm_.data() + ((channels == 0) ? 0 : (pcmFrames_ * channels));
+        const tFrameCount room = AudioPcmBufferFrames - pcmFrames_;
 
         size_t consumed = 0;
         tFrameCount produced = 0;
         const tAudioDecoder::eResult result =
             decoder_->Decode(input_.Data(), input_.Available(), endOfFile_,
-                             consumed, pcm_.data(), MaxDecodedFrames, produced);
+                             consumed, dest, room, produced);
         input_.Consume(consumed);
 
         switch (result) {
@@ -496,10 +540,8 @@ inline void tAudioPlayer::PumpDecode(uint8_t attempts) {
                     UpdateDuration();
                 }
 
-                const uint8_t channels = decoder_->StreamInfo().channels;
-                ApplyGain(produced, channels);
-                pcmFrames_ = produced;
-                pcmWritten_ = 0;
+                ApplyGain(dest, produced * decoder_->StreamInfo().channels);
+                pcmFrames_ += produced;
                 break;
             }
 
@@ -550,15 +592,14 @@ inline void tAudioPlayer::PumpOutput() {
     }
 }
 
-inline void tAudioPlayer::ApplyGain(tFrameCount frames, uint8_t channels) {
-    if (gain_ >= GainUnity || channels == 0) {
+inline void tAudioPlayer::ApplyGain(tPcmSample* samples, size_t count) {
+    if (gain_ >= GainUnity || samples == nullptr || count == 0) {
         return;
     }
 
-    const size_t samples = frames * channels;
-    for (size_t index = 0; index < samples; ++index) {
-        const int32_t scaled = static_cast<int32_t>(pcm_[index]) * gain_;
-        pcm_[index] = static_cast<tPcmSample>(scaled >> GainShift);
+    for (size_t index = 0; index < count; ++index) {
+        const int32_t scaled = static_cast<int32_t>(samples[index]) * gain_;
+        samples[index] = static_cast<tPcmSample>(scaled >> GainShift);
     }
 }
 
@@ -596,7 +637,11 @@ inline void tAudioPlayer::PumpPriming() {
     FillInput();
     ConfirmFormat();
 
-    PumpDecode(AudioDecodeAttemptsWhilePriming);
+    const tFrameCount target =
+        AudioPcmBufferFrames * AudioPrimePercent / 100;
+    if (pcmFrames_ < target && !decoderDone_) {
+        PumpDecode(AudioFramesWhilePriming);
+    }
 
     if (pcmFrames_ == 0) {
         // Nothing decoded and nothing left to try means there was no audio in
@@ -609,30 +654,34 @@ inline void tAudioPlayer::PumpPriming() {
         return;
     }
 
-    // Only the first decoded frame says what the format is, so the hardware
-    // cannot be started, or checked against the last song, any earlier.
+    // I2S stays off until the software buffer holds enough to survive the first
+    // ticks of playback. Starting it earlier lets the DMA drain while we are
+    // still decoding, which on a 40 MHz core empties the ring before Resume.
+    if (pcmFrames_ < target && !decoderDone_) {
+        return;
+    }
+
     if (!EnsureDriverFormat()) {
         Fail("Failed to start the audio output");
         return;
     }
 
-    // Held silent until the ring has enough in it to survive a slow tick. The
-    // ring is empty at the start of every song, whether or not the output was
-    // left running by the last one, so this is not conditional on that.
-    driver_.Pause();
-
-    PumpOutput();
-
-    const tFrameCount target = driver_.RingFrames() * AudioPrimePercent / 100;
-    if (driver_.QueuedFrames() >= target || decoderDone_) {
-        driver_.Resume();
-        Log::Info("Audio primed, playing");
-        state_ = eState::Playing;
+    while (pcmFrames_ != 0) {
+        const tFrameCount before = pcmWritten_;
+        PumpOutput();
+        if (pcmWritten_ == before) {
+            break;
+        }
     }
+
+    driver_.Resume();
+    Log::Info("Audio primed, playing");
+    state_ = eState::Playing;
 }
 
 inline void tAudioPlayer::PumpPlaying() {
-    PumpDecode(AudioDecodeAttemptsPerTick);
+    PumpOutput();
+    PumpDecode(AudioFramesPerTick);
 
     if (pcmFrames_ != 0 && !EnsureDriverFormat()) {
         Fail("Failed to restart the audio output");

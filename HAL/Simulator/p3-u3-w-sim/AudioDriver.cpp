@@ -21,9 +21,10 @@
 
 namespace {
 
-// 2048 stereo frames, about 46 ms at 44.1 kHz, matching what the ESP32 and
-// STM32 ports are expected to configure.
-constexpr tFrameCount RingCapacityFrames = 2048;
+// 8192 stereo frames, about 186 ms at 44.1 kHz, matching AudioRingFrames so a
+// tick that is long enough to be heard on the ESP32 or STM32 is long enough to
+// be heard here.
+constexpr tFrameCount RingCapacityFrames = AudioRingFrames;
 
 // What QAudioSink reads ahead of us. Kept small so the audio dropped when a song
 // is skipped is a few milliseconds rather than a noticeable tail.

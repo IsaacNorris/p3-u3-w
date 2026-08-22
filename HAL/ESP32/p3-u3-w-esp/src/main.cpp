@@ -58,6 +58,11 @@ void setup() {
     // are chasing a rail sag: the detector trips at about 2.7 V, the card needs
     // about the same, and the inrush of SD.begin is enough to reset the board
     // and leave the card wedged so the next boot fails the mount.
+
+    // Idle at 40 MHz. Playback raises this to 80 MHz in tAudioDriver because
+    // original-ESP32 I2S clocks from the 160 MHz PLL, which 40 MHz turns off.
+    setCpuFrequencyMhz(40);
+
 #ifndef BROWNOUT_DETECT
     WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
 #endif
@@ -66,6 +71,9 @@ void setup() {
     delay(500);
     Serial.println();
     Serial.println("p3-u3-w boot");
+    Serial.print("CPU: ");
+    Serial.print(getCpuFrequencyMhz());
+    Serial.println(" MHz");
     Serial.print("Last reset: ");
     Serial.println(ResetReason());
 

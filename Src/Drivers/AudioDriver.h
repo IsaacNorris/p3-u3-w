@@ -34,9 +34,13 @@ inline constexpr uint8_t MaxAudioChannels = 2;
 //   STM32WB55 SAI or I2S in circular DMA over a static buffer, Write copying
 //             into the half the DMA is not currently reading.
 //
-// Ring size is the port's call, but aim for 40-90 ms of audio: below that a
-// long tick in the superloop is audible, and above it seeking and pausing start
-// to feel slow. At 44.1 kHz stereo, 8 KB is about 46 ms.
+// Ring size is shared so the simulator underruns where the targets would. It is
+// sized for a 40 Hz superloop on a ~40-64 MHz MCU: one MP3 frame is 26 ms, a
+// slow tick with a display refresh and a card read is longer than that, and the
+// DMA has to outlast the tick with room for the player to catch up. 8192 frames
+// is 186 ms at 44.1 kHz, 171 ms at 48 kHz, about 32 KB of stereo PCM.
+inline constexpr tFrameCount AudioRingFrames = 8192;
+
 class tAudioDriver {
    public:
     tAudioDriver() = default;
